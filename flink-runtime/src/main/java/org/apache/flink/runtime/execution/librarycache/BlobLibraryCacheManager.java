@@ -29,9 +29,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import com.google.common.io.Files;
 import org.apache.flink.runtime.blob.BlobKey;
 import org.apache.flink.runtime.blob.BlobService;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
@@ -257,6 +260,41 @@ public final class BlobLibraryCacheManager extends TimerTask implements LibraryC
 		}
 	}
 
+	@Override
+	public List<File> GetAllRequiredJarFiles(List<BlobKey> blobKeys) throws IOException {
+		Preconditions.checkNotNull(blobKeys, "The BlobKeys must not be null.");
+
+		List requiredJarFiles = new ArrayList();
+		for (BlobKey blobKey : blobKeys) {
+			File file = getFile(blobKey);
+			requiredJarFiles.add(file);
+		}
+		return requiredJarFiles;
+	}
+
+	@Override
+	public Set<BlobKey> getRegisteredTaskBlobKeys(JobID jobId) {
+		Preconditions.checkNotNull(jobId, "The JobId must not be null.");
+		synchronized (lockObject) {
+			LibraryCacheEntry entry = cacheEntries.get(jobId);
+			if (entry != null) {
+				return entry.getLibraries();
+			}
+		}
+		return null;
+	}
+
+	@Override
+	public void SaveJarsToFilesystem(LibraryCacheManager manager, JobID jobId, String path) throws IOException {
+		Preconditions.checkNotNull(manager, "The LibraryCacheManager must not be null.");
+		Preconditions.checkNotNull(jobId, "The JobId must not be null.");
+
+		List<BlobKey> blobKeys = new ArrayList<BlobKey>(getRegisteredTaskBlobKeys(jobId));
+		for (File file : GetAllRequiredJarFiles(blobKeys)) {
+			LOG.info("Saving file in {}", file.getCanonicalPath());
+			Files.copy(file, new File(String.format("%s%s-%s.jar", path, jobId, file.getName())));
+		}
+	}
 
 	// --------------------------------------------------------------------------------------------
 

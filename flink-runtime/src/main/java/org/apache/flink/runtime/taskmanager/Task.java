@@ -379,6 +379,10 @@ public class Task implements Runnable {
 				executionState == ExecutionState.FAILED;
 	}
 
+	private boolean isFailed() {
+		return executionState == ExecutionState.FAILED;
+	}
+
 	/**
 	 * If the task has failed, this method gets the exception that caused this task to fail.
 	 * Otherwise this method returns null.
@@ -599,6 +603,10 @@ public class Task implements Runnable {
 					ExecutionState current = this.executionState;
 					if (current == ExecutionState.RUNNING || current == ExecutionState.DEPLOYING) {
 						if (STATE_UPDATER.compareAndSet(this, current, ExecutionState.FAILED)) {
+
+							if (isFailed()) {
+								notifySaveTask();
+							}
 							// proper failure of the task. record the exception as the root cause
 							failureCause = t;
 							notifyObservers(ExecutionState.FAILED, t);
@@ -728,6 +736,10 @@ public class Task implements Runnable {
 		taskManager.tell(new FatalError(message, cause), ActorRef.noSender());
 	}
 
+	private void notifySaveTask() {
+		taskManager.tell(new TaskMessages.SaveTask(executionId),ActorRef.noSender());
+	}
+
 	// ----------------------------------------------------------------------------------------------------------------
 	//  Canceling / Failing the task from the outside
 	// ----------------------------------------------------------------------------------------------------------------
@@ -832,6 +844,10 @@ public class Task implements Runnable {
 		for (ActorRef listener : executionListenerActors) {
 			listener.tell(actorMessage, ActorRef.noSender());
 		}
+	}
+
+	private void notifyFailedTaskArchives() {
+		taskManager.tell(new TaskInFinalState(executionId), ActorRef.noSender());
 	}
 
 	// ------------------------------------------------------------------------

@@ -446,18 +446,22 @@ function _fillTableArchive(table, job, prepend) {
 	if($("#"+job.jobid+"_archive").length > 0) {
 		return false;
 	}
+
+	var archivedJobStateHint = job.status != "FINISHED" ? "&nbsp;" + job.status : "";
 	
 	if(prepend)
 		$(table).prepend(
 				"<li id=\""+job.jobid+"_archive\"><a href=\"analyze.html?job=" + job.jobid + "\">"
 						+ job.jobname + " ("
 						+ formattedTimeFromTimestamp(parseInt(job.time))
+						+ archivedJobStateHint
 						+ ")</a></li>");
 	else
 		$(table).append(
 				"<li><a href=\"analyze.html?job=" + job.jobid + "\">"
 						+ job.jobname + " ("
 						+ formattedTimeFromTimestamp(parseInt(job.time))
+						+ archivedJobStateHint
 						+ ")</a></li>");
 	if (job.status == "FINISHED")
 		archive_finished++;

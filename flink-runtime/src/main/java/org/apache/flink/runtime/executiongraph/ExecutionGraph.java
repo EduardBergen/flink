@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 import scala.concurrent.duration.FiniteDuration;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -131,6 +132,8 @@ public class ExecutionGraph implements Serializable {
 	/** A list of all libraries required during the job execution. Libraries have to be stored
 	 * inside the BlobService and are referenced via the BLOB keys. */
 	private final List<BlobKey> requiredJarFiles;
+
+	private List<File> failedRequiredJarFiles;
 
 	/** Listeners that receive messages when the entire job switches it status (such as from
 	 * RUNNING to FINISHED) */
@@ -237,6 +240,7 @@ public class ExecutionGraph implements Serializable {
 		this.stateTimestamps[JobStatus.CREATED.ordinal()] = System.currentTimeMillis();
 
 		this.requiredJarFiles = requiredJarFiles;
+		this.failedRequiredJarFiles = new ArrayList<File>();
 
 		this.timeout = timeout;
 	}
@@ -364,6 +368,14 @@ public class ExecutionGraph implements Serializable {
 	 */
 	public List<BlobKey> getRequiredJarFiles() {
 		return this.requiredJarFiles;
+	}
+
+	public List<File> getFailedRequiredJarFiles() {
+		return this.failedRequiredJarFiles;
+	}
+
+	public void addFailedRequiredJarFiles(List<File> failedRequiredJarFiles) {
+		this.failedRequiredJarFiles = failedRequiredJarFiles;
 	}
 
 	public Scheduler getScheduler() {

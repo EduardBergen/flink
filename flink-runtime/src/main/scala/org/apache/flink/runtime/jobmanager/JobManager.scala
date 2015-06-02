@@ -54,7 +54,7 @@ import org.apache.flink.runtime.jobmanager.accumulators.AccumulatorManager
 import org.apache.flink.runtime.jobmanager.scheduler.{Scheduler => FlinkScheduler}
 import org.apache.flink.runtime.messages.JobManagerMessages._
 import org.apache.flink.runtime.messages.RegistrationMessages._
-import org.apache.flink.runtime.messages.TaskManagerMessages.{SendStackTrace, Heartbeat}
+import org.apache.flink.runtime.messages.TaskManagerMessages.{FailedTaskArchives, SendStackTrace, Heartbeat}
 import org.apache.flink.util.{ExceptionUtils, InstantiationUtil}
 
 import akka.actor._
@@ -414,6 +414,19 @@ class JobManager(protected val flinkConfiguration: Configuration,
     case RequestStackTrace(instanceID) =>
       val taskManager = instanceManager.getRegisteredInstanceById(instanceID).getTaskManager
       taskManager forward SendStackTrace
+
+    case FailedTaskArchives(jobId, blobKeys) =>
+      currentJobs.get(jobId) match {
+        case Some((executionGraph, _)) =>
+          try {
+            val failedRequiredArchives = libraryCacheManager.GetAllRequiredJarFiles(blobKeys.asJava)
+            executionGraph.addFailedRequiredJarFiles(failedRequiredArchives)
+          } catch {
+            case t: Throwable => log.error(t, "Could not add failed jar archives to the execution graph {} for " +
+              "archiving.", executionGraph)
+          }
+      }
+
 
     case Terminated(taskManager) =>
       if (instanceManager.isRegistered(taskManager)) {

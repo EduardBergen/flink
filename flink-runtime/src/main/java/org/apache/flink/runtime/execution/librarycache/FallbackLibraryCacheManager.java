@@ -26,7 +26,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+
 
 public class FallbackLibraryCacheManager implements LibraryCacheManager {
 	
@@ -64,4 +68,21 @@ public class FallbackLibraryCacheManager implements LibraryCacheManager {
 
 	@Override
 	public void shutdown() {}
+
+	@Override
+	public List<File> GetAllRequiredJarFiles(List<BlobKey> blobKeys) throws IOException {
+		LOG.warn("FallbackLibraryCacheManager does only return an empty collection of blobKeys.");
+		return new ArrayList<File>();
+	}
+
+	@Override
+	public Set<BlobKey> getRegisteredTaskBlobKeys(JobID jobId) {
+		LOG.warn("FallbackLibraryCacheManager does not book keeping of job IDs and thus has no BlobKeys.");
+		return null;
+	}
+
+	@Override
+	public void SaveJarsToFilesystem(LibraryCacheManager manager, JobID jobId, String path) throws IOException {
+		LOG.warn("FallbackLibraryCacheManager does not save anything to disk.");
+	}
 }

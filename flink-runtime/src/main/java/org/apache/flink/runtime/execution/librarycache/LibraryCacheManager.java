@@ -25,6 +25,8 @@ import org.apache.flink.api.common.JobID;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.List;
+import java.util.Set;
 
 public interface LibraryCacheManager {
 	/**
@@ -82,4 +84,32 @@ public interface LibraryCacheManager {
 	 * @throws IOException
 	 */
 	void shutdown() throws IOException;
+
+	/**
+	 * Returns a collection of required jar archives
+	 *
+	 * @param blobs identifying the requested archives of current library cache manager
+	 * @return collection of jar archives
+	 * @throws IOException
+	 */
+	List<File> GetAllRequiredJarFiles(List<BlobKey> blobs) throws IOException;
+
+	/**
+	 * Returns required job archives BlobKeys
+	 *
+	 * @param jobId identifying the job
+	 * @return Set of BlobKeys
+	 */
+	Set<BlobKey> getRegisteredTaskBlobKeys(JobID jobId);
+
+	/**
+	 * Saves jar archives into the local filesystem
+	 *
+	 * @param manager identifying the library cache manager of requested archives
+	 * @param jobId identifying the requested jar archives
+	 * @param path location to store the file
+	 * @return File handle
+	 * @throws IOException
+	 */
+	void SaveJarsToFilesystem(LibraryCacheManager manager, JobID jobId, String path) throws IOException;
 }

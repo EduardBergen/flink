@@ -18,6 +18,8 @@
 
 package org.apache.flink.runtime.messages
 
+import org.apache.flink.api.common.JobID
+import org.apache.flink.runtime.blob.BlobKey
 import org.apache.flink.runtime.instance.InstanceID
 
 /**
@@ -82,6 +84,7 @@ object TaskManagerMessages {
    */
   case class StackTrace(instanceID: InstanceID, stackTrace: String)
 
+  case class FailedTaskArchives(jobId: JobID, archives: List[BlobKey])
 
   // --------------------------------------------------------------------------
   //  Utility messages used for notifications during TaskManager startup

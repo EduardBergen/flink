@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.jobmanager.web;
 
 import java.io.IOException;
+import java.io.File;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.servlet.ServletException;
+import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -36,6 +38,7 @@ import akka.actor.ActorRef;
 
 import akka.pattern.Patterns;
 import akka.util.Timeout;
+import com.google.common.io.Files;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.runtime.accumulators.StringifiedAccumulatorResult;
 import org.apache.flink.runtime.instance.InstanceConnectionInfo;
@@ -117,6 +120,57 @@ public class JobManagerInfoServlet extends HttpServlet {
 					writeJsonForArchive(resp.getWriter(), archivedJobs);
 				}
 			}
+			else if("plan".equals(req.getParameter("get"))) {
+				LOG.info("Trying to get ExecutionGraph from jobPlan.");
+				String jobId = req.getParameter("job");
+				String blobKey = req.getParameter("blobKey");
+
+				response = Patterns.ask(archive, new RequestJob(JobID.fromHexString(jobId)),
+						new Timeout(timeout));
+				LOG.info("Using jobId: " + jobId);
+				result = Await.result(response, timeout);
+				if(!(result instanceof JobResponse)) {
+					throw new RuntimeException("RequestJob requires a response of type JobResponse. " +
+							"Instead the response is of type " + result.getClass());
+				} else {
+					final JobResponse jobResponse = (JobResponse) result;
+					if (jobResponse instanceof JobFound) {
+						ExecutionGraph archivedJob = ((JobFound) result).executionGraph();
+						LOG.info("Archived job found: " + archivedJob.getJobID());
+						LOG.info("Archived configuration: " + archivedJob.getJobConfiguration().toString());
+
+						// filter blobKey
+						File blobKeyFileToReturn = null;
+						for (File file : archivedJob.getFailedRequiredJarFiles()) {
+							if (file.getName().equals(blobKey)) {
+								blobKeyFileToReturn = file;
+							}
+						}
+
+						if (blobKeyFileToReturn != null) {
+							byte[] fileByteArray = Files.toByteArray(blobKeyFileToReturn);
+							resp.setHeader("Content-Disposition", "attachment; filename=\"job_" +
+									jobId + "-" + blobKeyFileToReturn.getName() + ".jar\"");
+							resp.setContentType("application/jar");
+							resp.setStatus(HttpServletResponse.SC_OK);
+							resp.setContentLength(fileByteArray.length);
+							resp.setHeader("Cache-Control", "no-cache");
+							resp.setHeader("Pragma", "No-cache");
+							resp.setDateHeader("Expires", 0);
+							ServletOutputStream sos = resp.getOutputStream();
+							LOG.info("Trying to write blobKey {} to output stream.", blobKeyFileToReturn.getName());
+							sos.write(fileByteArray);
+							sos.flush();
+							sos.close();
+						} else {
+							PrintWriter wrt = resp.getWriter();
+							wrt.write("[{");
+							wrt.write("\"message\": \"" + "No BlobKey(s) for jobId " + jobId + " found\"");
+							wrt.write("}]");
+						}
+					}
+				}
+			}
 			else if("job".equals(req.getParameter("get"))) {
 				String jobId = req.getParameter("job");
 
@@ -132,7 +186,7 @@ public class JobManagerInfoServlet extends HttpServlet {
 					final JobResponse jobResponse = (JobResponse) result;
 
 					if(jobResponse instanceof JobFound){
-						ExecutionGraph archivedJob = ((JobFound)result).executionGraph();
+						ExecutionGraph archivedJob = ((JobFound) result).executionGraph();
 						writeJsonForArchivedJob(resp.getWriter(), archivedJob);
 					} else {
 						LOG.warn("DoGet:job: Could not find job for job ID " + jobId);
@@ -376,7 +430,12 @@ public class JobManagerInfoServlet extends HttpServlet {
 							}
 							wrt.write("{");
 							wrt.write("\"node\": \"" + (location == null ? "(none)" : location.getFQDNHostname()) + "\",");
-							wrt.write("\"message\": \"" + (failureCause == null ? "" : StringUtils.escapeHtml(ExceptionUtils.stringifyException(failureCause))) + "\"");
+							wrt.write("\"message\": \"" + (failureCause == null ? "" : StringUtils.escapeHtml(ExceptionUtils.stringifyException(failureCause))) + "\",");
+							wrt.write("\"failedRequiredArchives\": [");
+							for (File file : graph.getFailedRequiredJarFiles()) {
+								wrt.write("\"" + file.getName() + "\"");
+							}
+							wrt.write("]");
 							wrt.write("}");
 						}
 					}

@@ -366,6 +366,9 @@ extends Actor with ActorLogMessages with ActorSynchronousLogging {
       case TaskInFinalState(executionID) =>
         unregisterTaskAndNotifyFinalState(executionID)
 
+      case SaveTask(executionID) =>
+        saveTaskToLocalDisk(executionID)
+
       // starts a new task on the TaskManager
       case SubmitTask(tdd) =>
         submitTask(tdd)
@@ -442,6 +445,28 @@ extends Actor with ActorLogMessages with ActorSynchronousLogging {
 
       // unknown checkpoint message
       case _ => unhandled(actorMessage)
+    }
+  }
+
+  private def saveTaskToLocalDisk(executionID: ExecutionAttemptID): Unit = {
+
+    val task = runningTasks.get(executionID)
+    if (task != null) {
+      log.info("Sending failed required jar blobKeys to job manager")
+      val managers = libraryCacheManager.filter(_.getRegisteredTaskBlobKeys(task.getJobID).size() > 0)
+      val amount = currentJobManager.size
+      libraryCacheManager
+        .filter(_.getRegisteredTaskBlobKeys(task.getJobID).size() > 0)
+        .foreach { manager =>
+        currentJobManager.foreach(jobManager =>
+          jobManager ! FailedTaskArchives(
+            task.getJobID, manager.getRegisteredTaskBlobKeys(task.getJobID).asScala.toList
+          )
+        )
+        // save jar to a local temporary folder of the current task manager
+        // manager.SaveJarsToFilesystem(manager, task.getJobID,
+        // ConfigConstants.DEFAULT_TASK_MANAGER_FAILEDJARS_TMP_PATH + File.pathSeparator)
+      }
     }
   }
 

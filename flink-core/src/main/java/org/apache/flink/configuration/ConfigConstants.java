@@ -492,6 +492,11 @@ public final class ConfigConstants {
 	 * The default directory for temporary files of the task manager.
 	 */
 	public static final String DEFAULT_TASK_MANAGER_TMP_PATH = System.getProperty("java.io.tmpdir");
+
+	/**
+	 * The default directory for temporary files of the task managers failed jars.
+	 */
+	public static final String DEFAULT_TASK_MANAGER_FAILEDJARS_TMP_PATH = System.getProperty("java.io.tmpdir");
 	
 	/**
 	 * The default fraction of the free memory allocated by the task manager's memory manager.

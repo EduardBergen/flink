@@ -69,6 +69,15 @@ object TaskMessages {
     extends TaskMessage
 
   /**
+   * Save the registered Job Jar Archives by [[executionID]]
+   * Sent to the TaskManager by failed tasks
+   *
+   * @param executionID
+   */
+  case class SaveTask(executionID: ExecutionAttemptID)
+    extends TaskMessage
+
+  /**
    * Notifies the TaskManager that the task has reached its final state,
    * either FINISHED, CANCELED, or FAILED.
    *

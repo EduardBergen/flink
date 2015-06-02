@@ -89,6 +89,16 @@ public class WordCount {
 					out.collect(new Tuple2<String, Integer>(token, 1));
 				}
 			}
+
+			// [TODO] Find a better place for a planned failure
+			try {
+				Thread.sleep(5000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+
+			// force a failure division by zero
+			double division = 10 / 0;
 		}
 	}
 	
