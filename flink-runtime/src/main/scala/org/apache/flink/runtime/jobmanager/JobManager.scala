@@ -18,9 +18,10 @@
 
 package org.apache.flink.runtime.jobmanager
 
-import java.io.{IOException, File}
+import java.io._
 import java.net.InetSocketAddress
-import java.util.Collections
+import java.nio.channels.FileChannel
+import java.util.{UUID, Collections}
 
 import akka.actor.Status.{Success, Failure}
 import grizzled.slf4j.Logger
@@ -312,6 +313,19 @@ class JobManager(protected val flinkConfiguration: Configuration,
                   "Job was cancelled.", error))
 
               case JobStatus.FAILED =>
+
+                val jobConfig = executionGraph.getJobConfiguration
+                val jobId = executionGraph.getJobID
+
+                val vertices = executionGraph.getVerticesTopologically
+
+
+                serializeToFile(executionGraph.getVerticesTopologically,"VerticesTopologically")
+
+
+                //val currentJob = currentJobs.get(jobId)
+
+
                 jobInfo.client ! Failure(new JobExecutionException(jobID,
                   "Job execution failed.", error))
 
@@ -419,8 +433,8 @@ class JobManager(protected val flinkConfiguration: Configuration,
       currentJobs.get(jobId) match {
         case Some((executionGraph, _)) =>
           try {
-            val failedRequiredArchives = libraryCacheManager.GetAllRequiredJarFiles(blobKeys.asJava)
-            executionGraph.addFailedRequiredJarFiles(failedRequiredArchives)
+            /*val failedRequiredArchives = libraryCacheManager.GetAllRequiredJarFiles(blobKeys.asJava)
+            executionGraph.addFailedRequiredJarFiles(failedRequiredArchives)*/
           } catch {
             case t: Throwable => log.error(t, "Could not add failed jar archives to the execution graph {} for " +
               "archiving.", executionGraph)
@@ -448,6 +462,21 @@ class JobManager(protected val flinkConfiguration: Configuration,
         instanceManager.unregisterTaskManager(taskManager)
         context.unwatch(taskManager)
       }
+  }
+
+  private def serializeToFile(obj:Object, name:String): Unit ={
+    val tempFile = new File(new File(ConfigConstants.DEFAULT_TASK_MANAGER_TMP_PATH), name)
+    try {
+      val fos = new FileOutputStream(tempFile)
+      val oos = new ObjectOutputStream(fos)
+      oos.writeObject(obj)
+      fos.close()
+    } catch {
+      case fileNotFoundException : FileNotFoundException =>
+        fileNotFoundException.printStackTrace()
+      case ioException : IOException =>
+        ioException.printStackTrace()
+    }
   }
 
   /**

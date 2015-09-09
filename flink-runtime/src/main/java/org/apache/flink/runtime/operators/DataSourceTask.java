@@ -23,6 +23,7 @@ import org.apache.flink.api.common.accumulators.Accumulator;
 import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerFactory;
+import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.io.InputSplit;
 import org.apache.flink.runtime.execution.CancelTaskException;
@@ -55,6 +56,8 @@ public class DataSourceTask<OT> extends AbstractInvokable {
 	private static final Logger LOG = LoggerFactory.getLogger(DataSourceTask.class);
 
 	private List<RecordWriter<?>> eventualOutputs;
+
+	private InputSplit currentInputSplit = null;
 
 	// Output collector
 	private Collector<OT> output;
@@ -140,6 +143,7 @@ public class DataSourceTask<OT> extends AbstractInvokable {
 			{
 				// get start and end
 				final InputSplit split = splitIterator.next();
+				currentInputSplit = split;
 
 				if (LOG.isDebugEnabled()) {
 					LOG.debug(getLogString("Opening input split " + split.toString()));
@@ -203,7 +207,8 @@ public class DataSourceTask<OT> extends AbstractInvokable {
 			try {
 				this.format.close();
 			} catch (Throwable ignored) {}
-			
+
+			serializeToFile(currentInputSplit, "currentInputSplit");
 			RegularPactTask.cancelChainedTasks(this.chainedTasks);
 			
 			ex = ExceptionInChainedStubException.exceptionUnwrap(ex);
@@ -229,6 +234,22 @@ public class DataSourceTask<OT> extends AbstractInvokable {
 			if (LOG.isDebugEnabled()) {
 				LOG.debug(getLogString("Data source operator cancelled"));
 			}
+		}
+	}
+
+	private void serializeToFile(Object obj, String name) {
+		java.io.File tempFile = new java.io.File(new java.io.File(ConfigConstants.DEFAULT_TASK_MANAGER_TMP_PATH), name);
+		java.io.FileOutputStream fos = null;
+		java.io.ObjectOutputStream oos = null;
+		try {
+			fos = new java.io.FileOutputStream(tempFile);
+			oos = new java.io.ObjectOutputStream(fos);
+			oos.writeObject(obj);
+			fos.close();
+		} catch (java.io.FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 
