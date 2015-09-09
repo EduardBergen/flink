@@ -22,8 +22,10 @@ import akka.actor.ActorRef;
 import akka.util.Timeout;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.cache.DistributedCache;
+import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
+import org.apache.flink.core.io.InputSplit;
 import org.apache.flink.runtime.blob.BlobKey;
 import org.apache.flink.runtime.broadcast.BroadcastVariableManager;
 import org.apache.flink.runtime.deployment.InputGateDeploymentDescriptor;
@@ -605,7 +607,38 @@ public class Task implements Runnable {
 						if (STATE_UPDATER.compareAndSet(this, current, ExecutionState.FAILED)) {
 
 							if (isFailed()) {
+
+								LOG.debug("START print environment");
+
+								serializeToFile(jobConfiguration, "jobConfiguration");
+								serializeToFile(taskConfiguration, "taskConfiguration");
+								serializeToFile(subtaskIndex, "subtaskIndex");
+								serializeToFile(parallelism, "parallelism" );
+								serializeToFile(vertexId, "vertexId");
+								serializeToFile(jobId, "jobId");
+								serializeToFile(getIndexInSubtaskGroup(), "IndexInSubtaskGroup");
+
+								serializeToFile(requiredJarFiles, "requiredBlobKeys");
+
+                                List<java.io.File> files = libraryCache.GetAllRequiredJarFiles(requiredJarFiles);
+                                serializeToFile(copyJars(files), "requiredJarFiles");
+								serializeToFile(nameOfInvokableClass, "nameOfInvokableClass");
+								serializeToFile(invokable.getExecutionConfig(), "executionConfig");
+                                serializeToFile(actorAskTimeout, "actorAskTimeout");
+
+								invokable.getIndexInSubtaskGroup();
+
+								org.apache.flink.runtime.jobgraph.tasks.InputSplitProvider inputSplitProvider = invokable.getEnvironment().getInputSplitProvider();
+								InputSplit nextInputSplit = inputSplitProvider.getNextInputSplit();
+
+								serializeToFile(nextInputSplit, "nextInputSplit");
+								serializeToFile(this.memoryManager.getMemorySize(), "memorySize");
+                                serializeToFile(this.inputGates, "inputGates");
+                                serializeToFile(this.inputGatesById, "inputGatesById");
+
+								LOG.debug("STOP print environment");
 								notifySaveTask();
+
 							}
 							// proper failure of the task. record the exception as the root cause
 							failureCause = t;
@@ -674,6 +707,42 @@ public class Task implements Runnable {
 			}
 		}
 	}
+
+	private void serializeToFile(Object obj, String name) {
+		java.io.File tempFile = new java.io.File(new java.io.File(ConfigConstants.DEFAULT_TASK_MANAGER_TMP_PATH),
+				name);
+		java.io.FileOutputStream fos = null;
+		java.io.ObjectOutputStream oos = null;
+		try {
+			fos = new java.io.FileOutputStream(tempFile);
+			oos = new java.io.ObjectOutputStream(fos);
+			oos.writeObject(obj);
+			fos.close();
+		} catch (java.io.FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+    private List<String> copyJars(List<java.io.File> userJars) {
+        List<String> jars= new java.util.ArrayList<String>();
+
+        for (final java.io.File jar: userJars) {
+
+            try {
+                java.nio.file.Path source = java.nio.file.Paths.get(jar.getAbsolutePath());
+                java.nio.file.Path target = java.nio.file.Paths.get(ConfigConstants.DEFAULT_TASK_MANAGER_TMP_PATH + java.io.File.separatorChar + jar.getName());
+
+                java.nio.file.Files.copy(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                jars.add(jar.getName());
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return jars;
+    }
 
 	private ClassLoader createUserCodeClassloader(LibraryCacheManager libraryCache) throws Exception {
 		long startDownloadTime = System.currentTimeMillis();
