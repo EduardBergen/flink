@@ -18,6 +18,7 @@ import org.apache.flink.runtime.instance.InstanceConnectionInfo;
 import org.apache.flink.runtime.io.disk.iomanager.IOManager;
 import org.apache.flink.runtime.io.disk.iomanager.IOManagerAsync;
 import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
+import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 import org.apache.flink.runtime.io.network.partition.*;
 import org.apache.flink.runtime.io.network.partition.consumer.SingleInputGate;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -196,30 +197,22 @@ public class Freeze {
 
             String owningTaskName = "CHAIN DataSource (at getTextDataSet(WordCount.java:141) (org.apache.flink.api.java.io.TextInputFormat)) -> FlatMap (FlatMap at main(WordCount.java:50)) -> Combine(SUM(1), at main(WordCount.java:50) (1/1) (1cef6f97332a2cc31a350a0952008781)";
             ResultPartitionID resultPartitionId = new ResultPartitionID();
-            int indexInSubTaskGroup = 0;
+            int numberOfSubpartitions = 1;
             ResultPartitionManager resultPartitionManager = new ResultPartitionManager();
 
             ResultPartition resultPartition = new ResultPartition(owningTaskName, jobId, resultPartitionId, ResultPartitionType.PIPELINED,
-                    indexInSubTaskGroup, resultPartitionManager, new LoggerResultPartitionConsumableNotifier(LOG), ioManager, IOManager.IOMode.ASYNC);
+                    numberOfSubpartitions, resultPartitionManager, new LoggerResultPartitionConsumableNotifier(LOG), ioManager, IOManager.IOMode.ASYNC);
 
+            //final int parallelism = 32;
+            final int BUFFER_SIZE = 32 * 1024;
+            final int producerBufferPoolSize = parallelism + 1;
+            final NetworkBufferPool networkBuffers = new NetworkBufferPool(
+                    (parallelism * producerBufferPoolSize) + (parallelism * parallelism),
+                    BUFFER_SIZE);
+
+            // Create a buffer pool for this partition
+            resultPartition.registerBufferPool(networkBuffers.createBufferPool(producerBufferPoolSize, true));
             writers[0] = new ResultPartitionWriter(resultPartition);
-
-            //
-            //
-            // Maybe the ResultWrite must be resetted
-
-/*
-            producedPartitions[0] = new ResultPartition(
-                    indexInSubtaskGroup, //taskNameWithSubtasksAndId
-                    jobId,
-                    1, //partitionId
-                    desc.getPartitionType(),
-                    desc.getNumberOfSubpartitions(),
-                    networkEnvironment.getPartitionManager(),
-                    networkEnvironment.getPartitionConsumableNotifier(),
-                    ioManager,
-                    networkEnvironment.getDefaultIOMode());
-*/
 
             //
             //
